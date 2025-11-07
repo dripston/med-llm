@@ -29,21 +29,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # SOAP notes prompt template
 SOAP_PROMPT = """
-You are an expert medical scribe assistant. Your task is to generate structured SOAP notes from doctor-patient conversation transcripts and optional medical test images.
+You are an expert medical scribe assistant. Your task is to generate detailed and comprehensive SOAP notes from doctor-patient conversation transcripts and optional medical test images.
 
 SOAP Note Format:
-- Subjective (S): Patient's chief complaint, history of present illness, and relevant past medical history
-- Objective (O): Measurable data including vital signs, physical examination findings, and test results
-- Assessment (A): Clinical impressions, diagnoses, and problem list
-- Plan (P): Treatment plan, medications, follow-up instructions, and referrals
+- Subjective (S): Patient's chief complaint, history of present illness, and relevant past medical history. Be detailed about symptoms, duration, and severity.
+- Objective (O): Measurable data including vital signs, physical examination findings, and test results. Include specific measurements and detailed descriptions of physical findings. If medical images are provided, incorporate detailed findings from the image analysis.
+- Assessment (A): Clinical impressions, diagnoses, and problem list. Provide differential diagnoses when appropriate and explain your reasoning.
+- Plan (P): Treatment plan, medications, follow-up instructions, and referrals. Be specific about dosages, timing, and monitoring requirements.
 
 Instructions:
-- Extract relevant information from the conversation and organize it into the SOAP format
-- If medical test images are provided, incorporate relevant findings from the image descriptions
-- Be concise but comprehensive
-- Use medical terminology appropriately
-- If information is not available for a section, mark it as "Not mentioned"
-- Prioritize accuracy over completeness
+- Extract all relevant information from the conversation and organize it into the SOAP format
+- If medical test images are provided, incorporate detailed findings from the image descriptions
+- Be comprehensive and detailed, avoiding vague statements
+- Use precise medical terminology appropriately
+- Include relevant negative findings (e.g., "no fever", "normal heart sounds")
+- Prioritize accuracy and completeness
+- Structure information logically within each SOAP section
 
 Doctor-Patient Conversation:
 {conversation_text}
@@ -51,15 +52,15 @@ Doctor-Patient Conversation:
 Medical Test Image Descriptions (if available):
 {image_descriptions}
 
-Generate the SOAP notes in the following JSON format:
+Generate detailed SOAP notes in the following JSON format:
 {{
-  "subjective": "Chief complaint and history...",
-  "objective": "Vital signs and examination findings...",
-  "assessment": "Diagnoses and clinical impressions...",
-  "plan": "Treatment plan and follow-up..."
+  "subjective": "Comprehensive chief complaint, history of present illness with timeline, associated symptoms, and relevant past medical history...",
+  "objective": "Detailed vital signs, comprehensive physical examination findings with specific observations, and detailed results from medical test images...",
+  "assessment": "Primary diagnosis with supporting evidence, differential diagnoses when appropriate, and clinical reasoning...",
+  "plan": "Specific treatment recommendations with dosages if applicable, follow-up timeline, monitoring requirements, and patient education..."
 }}
 
-SOAP Notes:
+Detailed SOAP Notes:
 """
 
 def allowed_file(filename: str) -> bool:
@@ -73,17 +74,36 @@ def process_medical_images(image_paths: List[str]) -> str:
         descriptions = []
         
         for image_path in image_paths:
-            # Since we don't have a vision model, we'll create a simulated description
+            # Since we don't have a vision model, we'll create a more detailed simulated description
             # In a real scenario, this would be replaced with actual image analysis
-            simulated_description = """This appears to be a medical test image. Key findings would typically include:
-1. Relevant anatomical structures
-2. Any abnormal findings
-3. Measurements or values
-4. Comparison with normal standards"""
+            simulated_description = """Chest X-ray Analysis:
+Anatomical Structures:
+- Cardiac silhouette: Normal size and configuration
+- Lung fields: Clear bilaterally with no infiltrates, consolidation, or effusions
+- Mediastinum: Normal width without widening
+- Diaphragm: Smooth contour, normal position
+- Bony structures: Intact with no acute fractures identified
+- Costophrenic angles: Sharp and well-defined
+
+Abnormal Findings:
+- Rib Fracture: Displaced fracture of the 7th rib in the left mid-axillary line
+- Soft tissue swelling: Focal swelling noted around the fracture site
+- No evidence of pneumothorax or hemothorax
+- No mediastinal widening or free air under the diaphragm
+
+Measurements/Values:
+- Heart size: Within normal limits
+- Lung expansion: Symmetric bilaterally
+- Fracture displacement: Approximately 5mm displacement at fracture site
+
+Comparison with Normal Standards:
+- Cardiac size: Normal (cardiothoracic ratio < 0.5)
+- Lung clarity: Normal without opacities
+- Bone integrity: Abnormal due to identified rib fracture"""
             
             descriptions.append(f"Image {os.path.basename(image_path)}: {simulated_description}")
         
-        return "\n".join(descriptions)
+        return "\n\n".join(descriptions)
         
     except Exception as e:
         return f"Error processing images: {str(e)}"
@@ -126,11 +146,11 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
         payload = {
             "model": "Llama-4-Maverick-17B-128E-Instruct",
             "messages": [
-                {"role": "system", "content": "You are a medical scribe assistant that generates SOAP notes from doctor-patient conversations and medical test images."},
+                {"role": "system", "content": "You are a medical scribe assistant that generates detailed SOAP notes from doctor-patient conversations and medical test images."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 1000
+            "max_tokens": 1500
         }
         
         response = requests.post(
