@@ -97,6 +97,11 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
         if not api_key:
             api_key = os.environ.get('SAMBANOVA_API_KEY')
         
+        # Debug: Print API key status (remove in production)
+        print(f"API Key available: {api_key is not None}")
+        if api_key:
+            print(f"API Key length: {len(api_key)}")
+        
         if not api_key:
             # Return a default response if no API key is available
             return {
@@ -135,6 +140,8 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
             timeout=30
         )
         
+        print(f"SambaNova API response status: {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
             # Try to parse the JSON response
@@ -165,6 +172,7 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
                 }
         else:
             # Return a default response if API call fails
+            print(f"SambaNova API error: {response.status_code} - {response.text}")
             return {
                 "subjective": "Patient reported symptoms and medical history.",
                 "objective": "Physical examination findings and test results.",
@@ -174,6 +182,7 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
             
     except Exception as e:
         # Return a default response if there's an error
+        print(f"Error in generate_soap_notes: {e}")
         return {
             "subjective": "Patient reported symptoms and medical history.",
             "objective": "Physical examination findings and test results.",
@@ -188,6 +197,16 @@ def home():
         "status": "healthy",
         "service": "Medical AI Copilot API",
         "version": "1.0.0"
+    })
+
+@app.route('/debug-env')
+def debug_env():
+    """Debug endpoint to check environment variables"""
+    return jsonify({
+        "SAMBANOVA_API_KEY": os.environ.get('SAMBANOVA_API_KEY'),
+        "SAMBANOVA_API_KEY_LENGTH": len(os.environ.get('SAMBANOVA_API_KEY', '')),
+        "PORT": os.environ.get('PORT'),
+        "All env vars": dict(os.environ)
     })
 
 @app.route('/generate-soap', methods=['POST'])
