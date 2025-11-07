@@ -68,40 +68,72 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def process_medical_images(image_paths: List[str]) -> str:
-    """Process medical images and generate descriptions"""
+def analyze_medical_image(image_path: str, api_key: str) -> str:
+    """
+    Analyze medical image using SambaNova vision model
+    """
+    try:
+        # Read and encode image
+        with open(image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+        
+        # Call SambaNova vision API
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "Llama-4-Maverick-17B-128E-Instruct",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encoded_image}"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": "You are a radiologist. Analyze this medical image and provide a detailed description of the findings. Include anatomical structures, any abnormalities, measurements, and comparisons with normal standards. Be as specific and detailed as possible."
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 800,
+            "temperature": 0.3
+        }
+        
+        response = requests.post(
+            "https://api.sambanova.ai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            description = result["choices"][0]["message"]["content"]
+            return description
+        else:
+            return f"Error analyzing image: {response.status_code} - {response.text}"
+            
+    except Exception as e:
+        return f"Error analyzing image: {str(e)}"
+
+def process_medical_images(image_paths: List[str], api_key: str) -> str:
+    """
+    Process medical images and generate descriptions using SambaNova vision model
+    """
     try:
         descriptions = []
         
         for image_path in image_paths:
-            # Since we don't have a vision model, we'll create a more detailed simulated description
-            # In a real scenario, this would be replaced with actual image analysis
-            simulated_description = """Chest X-ray Analysis:
-Anatomical Structures:
-- Cardiac silhouette: Normal size and configuration
-- Lung fields: Clear bilaterally with no infiltrates, consolidation, or effusions
-- Mediastinum: Normal width without widening
-- Diaphragm: Smooth contour, normal position
-- Bony structures: Intact with no acute fractures identified
-- Costophrenic angles: Sharp and well-defined
-
-Abnormal Findings:
-- Rib Fracture: Displaced fracture of the 7th rib in the left mid-axillary line
-- Soft tissue swelling: Focal swelling noted around the fracture site
-- No evidence of pneumothorax or hemothorax
-- No mediastinal widening or free air under the diaphragm
-
-Measurements/Values:
-- Heart size: Within normal limits
-- Lung expansion: Symmetric bilaterally
-- Fracture displacement: Approximately 5mm displacement at fracture site
-
-Comparison with Normal Standards:
-- Cardiac size: Normal (cardiothoracic ratio < 0.5)
-- Lung clarity: Normal without opacities
-- Bone integrity: Abnormal due to identified rib fracture"""
-            
-            descriptions.append(f"Image {os.path.basename(image_path)}: {simulated_description}")
+            # Analyze image using SambaNova vision model
+            image_description = analyze_medical_image(image_path, api_key)
+            descriptions.append(f"Image {os.path.basename(image_path)} Analysis:\n{image_description}")
         
         return "\n\n".join(descriptions)
         
@@ -116,11 +148,6 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
         # Use environment variable if no API key provided
         if not api_key:
             api_key = os.environ.get('SAMBANOVA_API_KEY')
-        
-        # Debug: Print API key status (remove in production)
-        print(f"API Key available: {api_key is not None}")
-        if api_key:
-            print(f"API Key length: {len(api_key)}")
         
         if not api_key:
             # Return a default response if no API key is available
@@ -160,8 +187,6 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
             timeout=30
         )
         
-        print(f"SambaNova API response status: {response.status_code}")
-        
         if response.status_code == 200:
             result = response.json()
             # Try to parse the JSON response
@@ -192,7 +217,6 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
                 }
         else:
             # Return a default response if API call fails
-            print(f"SambaNova API error: {response.status_code} - {response.text}")
             return {
                 "subjective": "Patient reported symptoms and medical history.",
                 "objective": "Physical examination findings and test results.",
@@ -202,7 +226,6 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
             
     except Exception as e:
         # Return a default response if there's an error
-        print(f"Error in generate_soap_notes: {e}")
         return {
             "subjective": "Patient reported symptoms and medical history.",
             "objective": "Physical examination findings and test results.",
@@ -224,6 +247,7 @@ def debug_env():
     """Debug endpoint to check environment variables"""
     return jsonify({
         "SAMBANOVA_API_KEY": os.environ.get('SAMBANOVA_API_KEY'),
+        "SAMBANOVA_VISION_API_KEY": os.environ.get('SAMBANOVA_VISION_API_KEY'),
         "SAMBANOVA_API_KEY_LENGTH": len(os.environ.get('SAMBANOVA_API_KEY', '')),
         "PORT": os.environ.get('PORT'),
         "All env vars": dict(os.environ)
@@ -256,7 +280,12 @@ def generate_soap():
         # Process images if any
         image_descriptions = ""
         if image_paths:
-            image_descriptions = process_medical_images(image_paths)
+            # Get vision API key from environment
+            vision_api_key = os.environ.get('SAMBANOVA_VISION_API_KEY')
+            if vision_api_key:
+                image_descriptions = process_medical_images(image_paths, vision_api_key)
+            else:
+                image_descriptions = "Image analysis not available: No vision API key configured"
         
         # Get API key from request or environment
         api_key = request.form.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
@@ -273,6 +302,7 @@ def generate_soap():
         
         return jsonify({
             "status": "success",
+            "image_descriptions": image_descriptions,
             "soap_notes": soap_notes
         })
         
