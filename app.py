@@ -64,6 +64,44 @@ Generate detailed SOAP notes in the following JSON format:
 Detailed SOAP Notes:
 """
 
+# Differential diagnoses prompt template
+DIFFERENTIALS_PROMPT = """
+You are an expert physician assistant. Your task is to generate a comprehensive list of differential diagnoses based on the provided SOAP notes.
+
+Instructions:
+- Analyze the SOAP notes thoroughly
+- Generate a prioritized list of differential diagnoses
+- For each differential, provide supporting evidence from the SOAP notes
+- Include likelihood ranking (High, Moderate, Low)
+- Provide brief reasoning for each differential
+- Identify any red flags that require immediate attention
+- Suggest additional tests if needed to narrow down the diagnosis
+
+SOAP Notes:
+{soap_notes}
+
+Generate differential diagnoses in the following JSON format:
+{{
+  "primary_suspected_diagnosis": "Most likely diagnosis based on current information",
+  "differential_diagnoses": [
+    {{
+      "diagnosis": "Differential diagnosis 1",
+      "likelihood": "High/Moderate/Low",
+      "supporting_evidence": "Evidence from SOAP notes supporting this diagnosis",
+      "reasoning": "Brief explanation of why this is a possibility"
+    }}
+  ],
+  "red_flags": [
+    "Any concerning signs or symptoms requiring immediate attention"
+  ],
+  "additional_tests": [
+    "Suggested tests to help confirm or rule out diagnoses"
+  ]
+}}
+
+Comprehensive Differential Diagnoses:
+"""
+
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
     return '.' in filename and \
@@ -239,6 +277,90 @@ def generate_soap_notes(conversation_text: str, image_descriptions: str = "", ap
             "plan": "Treatment recommendations and follow-up instructions."
         }
 
+def generate_differential_diagnoses(soap_notes: dict, api_key: Optional[str] = None) -> dict:
+    """
+    Generate differential diagnoses based on SOAP notes using SambaNova LLM
+    """
+    try:
+        # Use environment variable if no API key provided
+        if not api_key:
+            api_key = os.environ.get('SAMBANOVA_API_KEY')
+        
+        if not api_key:
+            # Return a default response if no API key is available
+            return {
+                "error": "API key not available"
+            }
+        
+        # Convert SOAP notes to string format
+        soap_notes_str = json.dumps(soap_notes, indent=2)
+        
+        # Prepare the prompt
+        prompt = DIFFERENTIALS_PROMPT.format(soap_notes=soap_notes_str)
+        
+        # Call SambaNova API
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "Llama-4-Maverick-17B-128E-Instruct",
+            "messages": [
+                {"role": "system", "content": "You are an expert physician assistant that generates differential diagnoses based on SOAP notes."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 1500
+        }
+        
+        response = requests.post(
+            "https://api.sambanova.ai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            # Try to parse the JSON response
+            try:
+                # Extract JSON from the response content
+                content = result["choices"][0]["message"]["content"]
+                # Find JSON in the response
+                start = content.find('{')
+                end = content.rfind('}') + 1
+                if start != -1 and end != -1:
+                    json_str = content[start:end]
+                    return json.loads(json_str)
+                else:
+                    # Return a default structure if JSON not found
+                    return {
+                        "primary_suspected_diagnosis": "Unable to generate differential diagnoses",
+                        "differential_diagnoses": [],
+                        "red_flags": [],
+                        "additional_tests": []
+                    }
+            except:
+                # Return a default structure if parsing fails
+                return {
+                    "primary_suspected_diagnosis": "Unable to generate differential diagnoses",
+                    "differential_diagnoses": [],
+                    "red_flags": [],
+                    "additional_tests": []
+                }
+        else:
+            # Return a default response if API call fails
+            return {
+                "error": f"API call failed with status {response.status_code}"
+            }
+            
+    except Exception as e:
+        # Return a default response if there's an error
+        return {
+            "error": f"Error generating differential diagnoses: {str(e)}"
+        }
+
 @app.route('/')
 def home():
     """Health check endpoint"""
@@ -312,6 +434,36 @@ def generate_soap():
             "status": "success",
             "image_descriptions": image_descriptions,
             "soap_notes": soap_notes
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/generate-differentials', methods=['POST'])
+def generate_differentials():
+    """Generate differential diagnoses based on SOAP notes"""
+    try:
+        # Get SOAP notes from request
+        soap_notes = request.json.get('soap_notes')
+        
+        if not soap_notes:
+            return jsonify({
+                "status": "error",
+                "message": "SOAP notes are required"
+            }), 400
+        
+        # Get API key from request or environment
+        api_key = request.json.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
+        
+        # Generate differential diagnoses
+        differentials = generate_differential_diagnoses(soap_notes, api_key)
+        
+        return jsonify({
+            "status": "success",
+            "differential_diagnoses": differentials
         })
         
     except Exception as e:
