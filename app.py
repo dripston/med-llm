@@ -447,7 +447,14 @@ def generate_differentials():
     """Generate differential diagnoses based on SOAP notes"""
     try:
         # Get SOAP notes from request
-        soap_notes = request.json.get('soap_notes')
+        request_data = request.json
+        if not request_data:
+            return jsonify({
+                "status": "error",
+                "message": "Request data is required"
+            }), 400
+            
+        soap_notes = request_data.get('soap_notes')
         
         if not soap_notes:
             return jsonify({
@@ -456,7 +463,7 @@ def generate_differentials():
             }), 400
         
         # Get API key from request or environment
-        api_key = request.json.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
+        api_key = request_data.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
         
         # Generate differential diagnoses
         differentials = generate_differential_diagnoses(soap_notes, api_key)
@@ -464,6 +471,40 @@ def generate_differentials():
         return jsonify({
             "status": "success",
             "differential_diagnoses": differentials
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/refactor-soap', methods=['POST'])
+def refactor_soap():
+    """Refactor SOAP notes based on doctor's edits"""
+    try:
+        # Get original SOAP notes and edits from request
+        request_data = request.json
+        if not request_data:
+            return jsonify({
+                "status": "error",
+                "message": "Request data is required"
+            }), 400
+            
+        original_soap = request_data.get('original_soap', {})
+        edits = request_data.get('edits', {})
+        
+        # Create refactored SOAP notes by applying edits to original
+        refactored_soap = original_soap.copy()
+        
+        # Apply edits to each field if provided
+        for field in ['subjective', 'objective', 'assessment', 'plan']:
+            if field in edits and edits[field]:
+                refactored_soap[field] = edits[field]
+        
+        return jsonify({
+            "status": "success",
+            "refactored_soap": refactored_soap
         })
         
     except Exception as e:
