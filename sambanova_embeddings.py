@@ -6,6 +6,10 @@ import os
 import requests
 import json
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class SambaNovaEmbeddings:
     def __init__(self, api_key: str):
@@ -86,6 +90,9 @@ def test_sambanova_connection(api_key: str):
         return False
 
 if __name__ == "__main__":
-    # Test the connection
-    api_key = "363f2018-1001-4b9d-85de-d4652f80b41e"
-    test_sambanova_connection(api_key)
+    # Test the connection with API key from environment variables
+    api_key = os.environ.get('SAMBANOVA_API_KEY')
+    if api_key:
+        test_sambanova_connection(api_key)
+    else:
+        print("SAMBANOVA_API_KEY not found in environment variables")

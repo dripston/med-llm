@@ -17,12 +17,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-# Enable CORS for specific origins
-CORS(app, origins=["https://aero2-mu.vercel.app", "https://airo-backend.onrender.com"])
+# Enable CORS for specific origins with proper preflight handling including localhost for development
+CORS(app, origins=[
+    "https://aero2-mu.vercel.app", 
+    "https://airo-backend.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:3500"
+], 
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp', 'webp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Ensure upload folder exists

@@ -4,6 +4,11 @@ Script to check available models in SambaNova API
 
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def check_available_models(api_key):
     """
@@ -49,6 +54,9 @@ def check_available_models(api_key):
         return None
 
 if __name__ == "__main__":
-    # Use the API key
-    api_key = "1ed95c26-d518-47b5-aa69-217c7bc188aa"
-    check_available_models(api_key)
+    # Use the API key from environment variables
+    api_key = os.environ.get('SAMBANOVA_API_KEY')
+    if api_key:
+        check_available_models(api_key)
+    else:
+        print("SAMBANOVA_API_KEY not found in environment variables")

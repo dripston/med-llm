@@ -7,6 +7,10 @@ import requests
 import json
 import base64
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # SOAP notes prompt template
 SOAP_PROMPT = """
@@ -103,14 +107,13 @@ def process_medical_images(image_paths, api_key):
                 
             # Since we don't have a vision model, we'll create a simulated description
             # In a real scenario, this would be replaced with actual image analysis
-            simulated_description = """This appears to be a chest X-ray showing a rib fracture. Key findings include:
-1. Displacement of the 7th rib on the left side
-2. Soft tissue swelling around the fracture site
-3. No evidence of pneumothorax
-4. Normal cardiac silhouette
-5. Clear lung fields bilaterally"""
+            simulated_description = """This appears to be a medical test image. Key findings would typically include:
+1. Relevant anatomical structures
+2. Any abnormal findings
+3. Measurements or values
+4. Comparison with normal standards"""
             
-            descriptions.append(f"Image {image_path}: {simulated_description}")
+            descriptions.append(f"Image {os.path.basename(image_path)}: {simulated_description}")
         
         return "\n".join(descriptions)
         
@@ -133,8 +136,11 @@ if __name__ == "__main__":
     Doctor: I'm going to order a chest X-ray to check for any fractures.
     """
     
-    # Use the new API key to avoid rate limits
-    api_key = "1ed95c26-d518-47b5-aa69-217c7bc188aa"
+    # Use the API key from environment variables
+    api_key = os.environ.get('SAMBANOVA_API_KEY')
+    if not api_key:
+        print("SAMBANOVA_API_KEY not found in environment variables")
+        exit(1)
     
     # Check for chest X-ray image
     image_path = "rib_fracture_big_gallery.jpeg"
