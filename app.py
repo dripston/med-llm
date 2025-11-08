@@ -17,7 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Enable CORS for specific origins
+CORS(app, origins=["https://aero2-mu.vercel.app", "https://airo-backend.onrender.com"])
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -417,8 +418,8 @@ def generate_soap():
         else:
             image_descriptions = "No medical images provided"
         
-        # Get API key from request or environment
-        api_key = request.form.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
+        # Get API key from request or environment (use the new one if provided)
+        api_key = request.form.get('api_key') or os.environ.get('SAMBANOVA_API_KEY') or "53af35bf-eff2-4a47-a747-48db1497111d"
         
         # Generate SOAP notes
         soap_notes = generate_soap_notes(conversation_text, image_descriptions, api_key)
@@ -462,8 +463,8 @@ def generate_differentials():
                 "message": "SOAP notes are required"
             }), 400
         
-        # Get API key from request or environment
-        api_key = request_data.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
+        # Get API key from request or environment (use the new one if provided)
+        api_key = request_data.get('api_key') or os.environ.get('SAMBANOVA_API_KEY') or "53af35bf-eff2-4a47-a747-48db1497111d"
         
         # Generate differential diagnoses
         differentials = generate_differential_diagnoses(soap_notes, api_key)
