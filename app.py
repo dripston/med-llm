@@ -45,6 +45,7 @@ Instructions:
 - Include relevant negative findings (e.g., "no fever", "normal heart sounds")
 - Prioritize accuracy and completeness
 - Structure information logically within each SOAP section
+- If image analysis is not available or limited, clearly state this in the objective section
 
 Doctor-Patient Conversation:
 {conversation_text}
@@ -97,7 +98,7 @@ def analyze_medical_image(image_path: str, api_key: str) -> str:
                         },
                         {
                             "type": "text",
-                            "text": "You are a radiologist. Analyze this medical image and provide a detailed description of the findings. Include anatomical structures, any abnormalities, measurements, and comparisons with normal standards. Be as specific and detailed as possible."
+                            "text": "Analyze this medical image and provide specific findings. If you cannot analyze medical images or if the image is not a medical test, clearly state that. Do not provide hypothetical or template responses. Only provide actual analysis of what you can see in the image."
                         }
                     ]
                 }
@@ -116,6 +117,11 @@ def analyze_medical_image(image_path: str, api_key: str) -> str:
         if response.status_code == 200:
             result = response.json()
             description = result["choices"][0]["message"]["content"]
+            
+            # Check if the response indicates inability to analyze
+            if "cannot" in description.lower() or "not a medical" in description.lower() or "hypothetical" in description.lower():
+                return "Image analysis not available: The AI model cannot analyze this type of image or the image is not a medical test."
+            
             return description
         else:
             return f"Error analyzing image: {response.status_code} - {response.text}"
@@ -286,6 +292,8 @@ def generate_soap():
                 image_descriptions = process_medical_images(image_paths, vision_api_key)
             else:
                 image_descriptions = "Image analysis not available: No vision API key configured"
+        else:
+            image_descriptions = "No medical images provided"
         
         # Get API key from request or environment
         api_key = request.form.get('api_key') or os.environ.get('SAMBANOVA_API_KEY')
